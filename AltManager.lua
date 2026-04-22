@@ -29,18 +29,22 @@ local honorLabel = "Honor"
 local cofferKeyLabel = "Coffer Key"
 local radiantSparkDustLabel = "Rad Spark Dust"
 local isTimerunner = nil
+local worldBossQuests = {
+	[92560] = "Lu'ashal",
+	[92034] = "Thorm'belan",
+	[92636] = "Predaxas",
+	[92123] = "Cragpine"
+}
 
 SLASH_ALTMANAGER1 = "/aam";
 SLASH_ALTMANAGER2 = "/alts";
 
-local function GetCurrencyAmount(id)
+local function GetCurrencyStats(id)
 	local info = C_CurrencyInfo.GetCurrencyInfo(id)
-	return info.quantity;
-end
-
-local function GetCurrencyEarned(id)
-	local info = C_CurrencyInfo.GetCurrencyInfo(id)
-	return info.totalEarned;
+	if not info then return 0, 0, 0 end
+    
+    -- Returns: Owned, Earned (capped at max), and Max Cap
+	return info.quantity, math.min(info.totalEarned, info.maxQuantity), info.maxQuantity
 end
 
 local function spairs(t, order)
@@ -85,7 +89,6 @@ do
 	main_frame:RegisterEvent("PLAYER_LOGOUT")
 	main_frame:RegisterEvent("QUEST_TURNED_IN")
 	main_frame:RegisterEvent("BAG_UPDATE_DELAYED")
-	main_frame:RegisterEvent("ARTIFACT_XP_UPDATE")
 	main_frame:RegisterEvent("CHAT_MSG_CURRENCY")
 	main_frame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
 	main_frame:RegisterEvent("PLAYER_LEAVING_WORLD")
@@ -94,19 +97,17 @@ do
 		if event == "ADDON_LOADED" then
 			local loadedAddon = ...
 			if loadedAddon == addonName then
-				isTimerunner = PlayerGetTimerunningSeasonID()
+				isTimerunner = PlayerGetTimerunningSeasonID and PlayerGetTimerunningSeasonID() or nil
 				AltManager:OnLoad()
 			end
 		elseif event == "PLAYER_LOGIN" then
-			isTimerunner = PlayerGetTimerunningSeasonID()
+			isTimerunner = PlayerGetTimerunningSeasonID and PlayerGetTimerunningSeasonID() or nil
 			AltManager:OnLogin()
-		elseif event == "PLAYER_LEAVING_WORLD" or event == "ARTIFACT_XP_UPDATE" then
-			isTimerunner = PlayerGetTimerunningSeasonID()
+		elseif event == "PLAYER_LEAVING_WORLD" then
 			local data = AltManager:CollectData()
 			AltManager:StoreData(data)
 		elseif event == "BAG_UPDATE_DELAYED" or event == "QUEST_TURNED_IN" or event == "CHAT_MSG_CURRENCY" or event == "CURRENCY_DISPLAY_UPDATE" then
 			if AltManager.addon_loaded then
-				isTimerunner = PlayerGetTimerunningSeasonID()
 				local data = AltManager:CollectData()
 				AltManager:StoreData(data)
 			end
@@ -445,7 +446,7 @@ function AltManager:CreateFontFrame(parent, x_size, height, relative_to, y_offse
 end
 ]]
 
-local customFont = CreateFont("AltManagerCustomFont")
+
 function AltManager:CreateFontFrame(parent, x_size, height, relative_to, y_offset, label, justify, fontPath)
     local f = CreateFrame("Button", nil, parent)
     f:SetSize(x_size, height)
@@ -460,8 +461,7 @@ function AltManager:CreateFontFrame(parent, x_size, height, relative_to, y_offse
     fs:SetHeight(20)
 
     if fontPath then
-        customFont:SetFont(fontPath, 12, "")
-        fs:SetFontObject(customFont)
+        fs:SetFont(fontPath, 12, "")
     else
         fs:SetFontObject("GameFontHighlightSmall")
     end
@@ -720,46 +720,19 @@ function AltManager:CollectData()
 		mine_old = AltManagerDB.data[guid];
 	end
 
-	-- C_MythicPlus.RequestRewards();
-	C_MythicPlus.RequestCurrentAffixes();
-	C_MythicPlus.RequestMapInfo();
-	for k,v in pairs(dungeons) do
-		-- request info in advance
-		C_MythicPlus.RequestMapInfo(k);
-	end
-	local maps = C_ChallengeMode.GetMapTable();
-	for i = 1, #maps do
-        C_ChallengeMode.RequestLeaders(maps[i]);
-    end
-
 	local run_history = C_MythicPlus.GetRunHistory(false, true);
 
 	-- find keystone
-	local keystone_found = false;
-	for bag = BACKPACK_CONTAINER, NUM_BAG_SLOTS do
-		for slot=1, C_Container.GetContainerNumSlots(bag) do
-			local containerInfo = C_Container.GetContainerItemInfo(bag, slot)
-			if containerInfo ~= nil then
-				local slotItemID = containerInfo.itemID
-				local slotLink = containerInfo.hyperlink
-				if slotItemID == 180653 then
-					local itemString = slotLink:match("|Hkeystone:([0-9:]+)|h(%b[])|h")
-					local info = { strsplit(":", itemString) }
-					dungeon = tonumber(info[2])
-					if not dungeon then dungeon = nil end
-					level = tonumber(info[3])
-					if not level then level = nil end
-					keystone_found = true;
-					break -- Exit the loop after finding the keystone
-				end
-			end
-		end
-	end
+    local keystoneMapID = C_MythicPlus.GetOwnedKeystoneChallengeMapID()
+    local keystoneLevel = C_MythicPlus.GetOwnedKeystoneLevel()
 
-	if not keystone_found then
-		dungeon = "Unknown";
-		level = "?"
-	end
+    if keystoneMapID and keystoneLevel then
+        dungeon = keystoneMapID
+        level = keystoneLevel
+    else
+        dungeon = "Unknown"
+        level = "?"
+    end
 
 	local saves = GetNumSavedInstances();
 	local normal_difficulty = 14
@@ -768,6 +741,9 @@ function AltManager:CollectData()
 	local dreamriftMapName = C_Map.GetMapInfo(2531).name
 	local voidspireMapName = C_Map.GetMapInfo(2529).name
 	local queldanasMapName = C_Map.GetMapInfo(2533).name
+	local Dreamrift_Normal, Dreamrift_Heroic, Dreamrift_Mythic = 0, 0, 0
+	local Voidspire_Normal, Voidspire_Heroic, Voidspire_Mythic = 0, 0, 0
+	local Queldanas_Normal, Queldanas_Heroic, Queldanas_Mythic = 0, 0, 0
 	-- /run local mapID = C_Map.GetBestMapForUnit("player"); print(format("You are in %s (%d)", C_Map.GetMapInfo(mapID).name, mapID))
 	for i = 1, saves do
 		local raid_name, _, reset, difficulty, _, _, _, _, _, _, _, killed_bosses = GetSavedInstanceInfo(i);
@@ -787,12 +763,6 @@ function AltManager:CollectData()
 		end
 	end
 
-	local worldBossQuests = {
-		[92560] = "Lu'ashal",
-		[92034] = "Thorm'belan",
-		[92636] = "Predaxas",
-		[92123] = "Cragpine"
-	}
 	local worldboss = nil
 	for questID, bossName in pairs(worldBossQuests) do
 		if C_QuestLog.IsQuestFlaggedCompleted(questID) then
@@ -801,39 +771,20 @@ function AltManager:CollectData()
 		end
 	end
 
-	-- this is how the official pvp ui does it, so if its wrong.. sue me
-	local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID);
-	local maxProgress = currencyInfo.maxQuantity;
-	local conquest_earned = math.min(currencyInfo.totalEarned, maxProgress);
-	local conquest_total = currencyInfo.quantity
-
-
-	local voidcoreInfo = C_CurrencyInfo.GetCurrencyInfo(3418);
-	local voidcoreMaxProgress = voidcoreInfo.maxQuantity;
-	local voidcore_earned = math.min(voidcoreInfo.totalEarned, voidcoreMaxProgress);
-	local voidcore_total = voidcoreInfo.quantity
-
-	local manafluxInfo = C_CurrencyInfo.GetCurrencyInfo(3378);
-	local manafluxMaxProgress = manafluxInfo.maxQuantity;
-	local manaflux_earned = math.min(manafluxInfo.totalEarned, manafluxMaxProgress);
-	local manaflux_total = manafluxInfo.quantity
-
-	local radiantSparkDustInfo = C_CurrencyInfo.GetCurrencyInfo(3212);
-	local radiantSparkDustMaxProgress = radiantSparkDustInfo.maxQuantity;
-	local radiant_spark_dust_earned = math.min(radiantSparkDustInfo.totalEarned, radiantSparkDustMaxProgress);
-	local radiant_spark_dust_total = radiantSparkDustInfo.quantity
-
-
+	local conquest_total, conquest_earned = GetCurrencyStats(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID)
+	local voidcore_total, voidcore_earned = GetCurrencyStats(3418)
+	local manaflux_total, manaflux_earned = GetCurrencyStats(3378)
+	local radiant_spark_dust_total, radiant_spark_dust_earned = GetCurrencyStats(3212)
 	local _, ilevel = GetAverageItemLevel();
 	local gold = GetMoneyString(GetMoney(), true)
-	local adventurer_dawncrest = GetCurrencyAmount(3383);
-	local veteran_dawncrest = GetCurrencyAmount(3341);
-	local champion_dawncrest = GetCurrencyAmount(3343);
-	local hero_dawncrest = GetCurrencyAmount(3345);
-	local myth_dawncrest = GetCurrencyAmount(3347);
-	local honor_points = GetCurrencyAmount(1792);
-	local coffer_key = GetCurrencyAmount(3028);
-	local radiant_spark_dust = GetCurrencyAmount(3212);
+	local adventurer_dawncrest = GetCurrencyStats(3383);
+	local veteran_dawncrest = GetCurrencyStats(3341);
+	local champion_dawncrest = GetCurrencyStats(3343);
+	local hero_dawncrest = GetCurrencyStats(3345);
+	local myth_dawncrest = GetCurrencyStats(3347);
+	local honor_points = GetCurrencyStats(1792);
+	local coffer_key = GetCurrencyStats(3028);
+	local radiant_spark_dust = GetCurrencyStats(3212);
 	local mplus_data = C_PlayerInfo.GetPlayerMythicPlusRatingSummary('player')
 	local mplus_score = mplus_data.currentSeasonScore
 
@@ -1214,7 +1165,7 @@ function AltManager:CreateContent()
 		conquest_cap = {
 			order = 12,
 			label = conquestEarnedLabel,
-			data = function(alt_data) return (alt_data.conquest_earned and (tostring(alt_data.conquest_earned) .. " / " .. C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID).maxQuantity) or "?")  end, --   .. "/" .. "500"
+			data = function(alt_data) return (alt_data.conquest_earned and (tostring(alt_data.conquest_earned) .. " / " .. tostring(C_CurrencyInfo.GetCurrencyInfo(Constants.CurrencyConsts.CONQUEST_CURRENCY_ID).maxQuantity)) or "?") end,
 		},
 		dummy_line = {
 			order = 13,
