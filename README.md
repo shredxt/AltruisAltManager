@@ -1,16 +1,14 @@
 This addon displays helpful information about your alts such as:
-
-Item Level
-Gold
-Weekly Mythic Keystone completion
-Current Keystone
-Mythic+ Rating
-Major Currencies
-Honor
-Conquest
-Weekly Raid Boss Kills
+- Item Level
+- Gold
+- Weekly Mythic Keystone completion
+- Current Keystone
+- Mythic+ Rating
+- Major Currencies
+- Honor
+- Conquest
+- Weekly Raid Boss Kills
 
 Usage:
-
-Type `/alts` or `/aam` in chat
-Type `/alts help` or `/aam help` for some additional information
+- Type `/alts` or `/aam` in chat
+- Type `/alts help` or `/aam help` for some additional information
