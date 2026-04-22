@@ -1,7 +1,7 @@
 local _, AltManager = ...;
 _G["AltManager"] = AltManager;
 local Dialog = LibStub("LibDialog-1.0")
-local sizeY = 490;
+local sizeY = 510;
 local extendForInstances = 60;
 local offsetX = 0;
 local offsetY = 40;
@@ -26,8 +26,8 @@ local championDawncrestLabel = "Champ Dawncrest"
 local heroDawncrestLabel = "Hero Dawncrest"
 local mythDawncrestLabel = "Myth Dawncrest"
 local honorLabel = "Honor"
-local undercoinLabel = "Undercoin"
-local voidlightLabel = "Voidlight Marl"
+local cofferKeyLabel = "Coffer Key"
+local radiantSparkDustLabel = "Rad Spark Dust"
 local isTimerunner = nil
 
 SLASH_ALTMANAGER1 = "/aam";
@@ -445,21 +445,26 @@ function AltManager:CreateFontFrame(parent, x_size, height, relative_to, y_offse
 end
 ]]
 
+local customFont = CreateFont("AltManagerCustomFont")
 function AltManager:CreateFontFrame(parent, x_size, height, relative_to, y_offset, label, justify, fontPath)
     local f = CreateFrame("Button", nil, parent)
     f:SetSize(x_size, height)
     f:SetText(label)
     f:SetPoint("TOPLEFT", relative_to, "TOPLEFT", 0, y_offset)
-    f:GetFontString():SetJustifyH(justify)
-    f:GetFontString():SetJustifyV("MIDDLE")
+    
+    local fs = f:GetFontString()
+    fs:SetJustifyH(justify)
+    fs:SetJustifyV("MIDDLE")
     f:SetPushedTextOffset(0, 0)
-    f:GetFontString():SetWidth(120)
-    f:GetFontString():SetHeight(20)
+    fs:SetWidth(120)
+    fs:SetHeight(20)
 
-    -- Load and set the custom font
-    local customFont = CreateFont("MyCustomFont")
-    customFont:SetFont(fontPath, 12, "") -- Set the font path and size
-    f:GetFontString():SetFontObject("MyCustomFont") -- Set the font object for the frame
+    if fontPath then
+        customFont:SetFont(fontPath, 12, "")
+        fs:SetFontObject(customFont)
+    else
+        fs:SetFontObject("GameFontHighlightSmall")
+    end
 
     return f
 end
@@ -813,6 +818,12 @@ function AltManager:CollectData()
 	local manaflux_earned = math.min(manafluxInfo.totalEarned, manafluxMaxProgress);
 	local manaflux_total = manafluxInfo.quantity
 
+	local radiantSparkDustInfo = C_CurrencyInfo.GetCurrencyInfo(3212);
+	local radiantSparkDustMaxProgress = radiantSparkDustInfo.maxQuantity;
+	local radiant_spark_dust_earned = math.min(radiantSparkDustInfo.totalEarned, radiantSparkDustMaxProgress);
+	local radiant_spark_dust_total = radiantSparkDustInfo.quantity
+
+
 	local _, ilevel = GetAverageItemLevel();
 	local gold = GetMoneyString(GetMoney(), true)
 	local adventurer_dawncrest = GetCurrencyAmount(3383);
@@ -821,8 +832,8 @@ function AltManager:CollectData()
 	local hero_dawncrest = GetCurrencyAmount(3345);
 	local myth_dawncrest = GetCurrencyAmount(3347);
 	local honor_points = GetCurrencyAmount(1792);
-	local undercoin = GetCurrencyAmount(2803);
-	local voidlight_marl = GetCurrencyAmount(3316);
+	local coffer_key = GetCurrencyAmount(3028);
+	local radiant_spark_dust = GetCurrencyAmount(3212);
 	local mplus_data = C_PlayerInfo.GetPlayerMythicPlusRatingSummary('player')
 	local mplus_score = mplus_data.currentSeasonScore
 
@@ -842,6 +853,8 @@ function AltManager:CollectData()
 	char_table.voidcore_total = voidcore_total;
 	char_table.manaflux_earned = manaflux_earned;
 	char_table.manaflux_total = manaflux_total;
+	char_table.radiant_spark_dust_earned = radiant_spark_dust_earned;
+	char_table.radiant_spark_dust_total = radiant_spark_dust_total;
 
 	char_table.mplus_score = mplus_score
 	char_table.gold = gold;
@@ -850,8 +863,8 @@ function AltManager:CollectData()
 	char_table.hero_dawncrest = hero_dawncrest;
 	char_table.myth_dawncrest = myth_dawncrest;
 	char_table.adventurer_dawncrest = adventurer_dawncrest;
-	char_table.undercoin = undercoin;
-	char_table.voidlight_marl = voidlight_marl;
+	char_table.coffer_key = coffer_key;
+	char_table.radiant_spark_dust = radiant_spark_dust;
 	char_table.honor_points = honor_points;
 
 	char_table.dreamrift_normal = Dreamrift_Normal;
@@ -862,7 +875,7 @@ function AltManager:CollectData()
 	char_table.voidspire_heroic = Voidspire_Heroic;
 	char_table.voidspire_mythic = Voidspire_Mythic;
 
-		char_table.queldanas_normal = Queldanas_Normal;
+	char_table.queldanas_normal = Queldanas_Normal;
 	char_table.queldanas_heroic = Queldanas_Heroic;
 	char_table.queldanas_mythic = Queldanas_Mythic;
 
@@ -1139,24 +1152,29 @@ function AltManager:CreateContent()
 			data = function(alt_data) return tostring(alt_data.veteran_dawncrest or "?") end,
 		},
 		champion_dawncrest = {
-			order = 6.2,
+			order = 6.15,
 			label = championDawncrestLabel,
 			data = function(alt_data) return tostring(alt_data.champion_dawncrest or "?") end,
 		},
 		hero_dawncrest = {
-			order = 6.3,
+			order = 6.2,
 			label = heroDawncrestLabel,
 			data = function(alt_data) return tostring(alt_data.hero_dawncrest or "?") end,
 		},
 		myth_dawncrest = {
-			order = 6.4,
+			order = 6.25,
 			label = mythDawncrestLabel,
 			data = function(alt_data) return tostring(alt_data.myth_dawncrest or "?") end,
 		},
 		manaflux = {
-			order = 6.5,
+			order = 6.3,
 			label = manafluxLabel,
 			data = function(alt_data) return (alt_data.manaflux_total and (tostring(alt_data.manaflux_earned) .. " / " .. C_CurrencyInfo.GetCurrencyInfo(3378).maxQuantity) or "?")  end,
+		},
+		radiant_spark = {
+			order = 6.4,
+			label = radiantSparkDustLabel,
+			data = function(alt_data) return (alt_data.radiant_spark_dust_total and (tostring(alt_data.radiant_spark_dust_earned) .. " / " .. C_CurrencyInfo.GetCurrencyInfo(3212).maxQuantity) or "?")  end,
 		},
 		nebulous_voidcore = {
 			order = 6.6,
@@ -1167,6 +1185,11 @@ function AltManager:CreateContent()
 			order = 6.7,
 			label = voidcoreEarnedLabel,
 			data = function(alt_data) return (alt_data.voidcore_earned and (tostring(alt_data.voidcore_earned) .. " / " .. C_CurrencyInfo.GetCurrencyInfo(3418).maxQuantity) or "?")  end,
+		},
+		coffer_key = {
+			order = 6.8,
+			label = cofferKeyLabel,
+			data = function(alt_data) return (alt_data.coffer_key or "?")  end,
 		},
 		fake_just_for_offset_2 = {
 			order = 7,
