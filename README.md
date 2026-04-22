@@ -1,4 +1,4 @@
-[img]https://media.forgecdn.net/attachments/description/1017118/description_210c1f0c-10fd-41e2-af0f-e6d3738851af.png
+https://www.curseforge.com/wow/addons/altruis-alt-manager
 
 This addon displays helpful information about your alts such as:
 - Item Level
